@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, MessageCircle, Phone, User, Scissors, LogIn } from "lucide-react";
@@ -37,6 +37,25 @@ const Index = () => {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [date, setDate] = useState<Date>();
   const [time, setTime] = useState("");
+  const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+
+  const fetchBookedTimes = useCallback(async (selectedDate: Date) => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const { data } = await supabase.rpc("get_booked_times", { target_date: dateStr });
+    if (data) {
+      setBookedTimes(data.map((r: { booked_time: string }) => r.booked_time.slice(0, 5)));
+    }
+  }, []);
+
+  const handleDateSelect = (d: Date | undefined) => {
+    setDate(d);
+    setTime("");
+    if (d) {
+      fetchBookedTimes(d);
+    } else {
+      setBookedTimes([]);
+    }
+  };
 
   const total = useMemo(
     () =>
@@ -76,6 +95,9 @@ const Index = () => {
     } catch {
       // Silently continue — WhatsApp is the primary flow
     }
+
+    // Refresh booked times so the slot disappears
+    if (date) fetchBookedTimes(date);
 
     const serviceLines = SERVICES.filter((s) => selectedServices.includes(s.id))
       .map((s) => `• ${s.name} - R$${s.price}`)
@@ -196,7 +218,7 @@ ${serviceLines}
               <Calendar
                 mode="single"
                 selected={date}
-                onSelect={setDate}
+                onSelect={handleDateSelect}
                 disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
                 locale={ptBR}
                 className="p-3 pointer-events-auto"
@@ -205,21 +227,26 @@ ${serviceLines}
           </Popover>
 
           <div className="grid grid-cols-4 gap-2">
-            {HOURS.map((h) => (
-              <Button
-                key={h}
-                variant={time === h ? "default" : "outline"}
-                className={cn(
-                  "text-sm",
-                  time === h
-                    ? "bg-foreground text-background"
-                    : "bg-card border-border hover:bg-accent"
-                )}
-                onClick={() => setTime(h)}
-              >
-                {h}
-              </Button>
-            ))}
+            {HOURS.map((h) => {
+              const isBooked = bookedTimes.includes(h);
+              return (
+                <Button
+                  key={h}
+                  variant={time === h ? "default" : "outline"}
+                  disabled={isBooked}
+                  className={cn(
+                    "text-sm",
+                    isBooked && "opacity-30 line-through cursor-not-allowed",
+                    time === h
+                      ? "bg-foreground text-background"
+                      : "bg-card border-border hover:bg-accent"
+                  )}
+                  onClick={() => setTime(h)}
+                >
+                  {h}
+                </Button>
+              );
+            })}
           </div>
         </section>
 
