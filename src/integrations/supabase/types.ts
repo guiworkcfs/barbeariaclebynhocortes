@@ -14,13 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      appointments: {
+        Row: {
+          appointment_date: string
+          appointment_time: string
+          client_name: string
+          client_phone: string
+          created_at: string
+          id: string
+          services: string[]
+          total_price: number
+        }
+        Insert: {
+          appointment_date: string
+          appointment_time: string
+          client_name: string
+          client_phone: string
+          created_at?: string
+          id?: string
+          services: string[]
+          total_price: number
+        }
+        Update: {
+          appointment_date?: string
+          appointment_time?: string
+          client_name?: string
+          client_phone?: string
+          created_at?: string
+          id?: string
+          services?: string[]
+          total_price?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string | null
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

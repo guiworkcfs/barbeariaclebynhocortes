@@ -1,7 +1,10 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, MessageCircle, Phone, User, Scissors } from "lucide-react";
+import { CalendarIcon, MessageCircle, Phone, User, Scissors, LogIn } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -52,10 +55,29 @@ const Index = () => {
 
   const isFormValid = name && phone && selectedServices.length > 0 && date && time;
 
-  const handleWhatsApp = () => {
+  const { toast } = useToast();
+
+  const handleWhatsApp = async () => {
     if (!isFormValid) return;
 
-    const serviceNames = SERVICES.filter((s) => selectedServices.includes(s.id))
+    const selectedServiceNames = SERVICES.filter((s) => selectedServices.includes(s.id))
+      .map((s) => s.name);
+
+    // Save appointment to database
+    try {
+      await supabase.from("appointments").insert({
+        client_name: name,
+        client_phone: phone,
+        services: selectedServiceNames,
+        total_price: total,
+        appointment_date: format(date!, "yyyy-MM-dd"),
+        appointment_time: time + ":00",
+      });
+    } catch {
+      // Silently continue — WhatsApp is the primary flow
+    }
+
+    const serviceLines = SERVICES.filter((s) => selectedServices.includes(s.id))
       .map((s) => `• ${s.name} - R$${s.price}`)
       .join("\n");
 
@@ -65,7 +87,7 @@ const Index = () => {
 *Telefone:* ${phone}
 
 *Serviços:*
-${serviceNames}
+${serviceLines}
 
 *Total:* R$${total},00
 
@@ -219,6 +241,12 @@ ${serviceNames}
         <p className="mt-1 flex items-center justify-center gap-1">
           <Phone className="w-3 h-3" /> (82) 98724-3277
         </p>
+        <Link
+          to="/auth"
+          className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          <LogIn className="w-3 h-3" /> Área do barbeiro
+        </Link>
       </footer>
     </div>
   );
