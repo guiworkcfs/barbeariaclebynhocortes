@@ -76,6 +76,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_booked_times: {
+        Args: { target_date: string }
+        Returns: {
+          booked_time: string
+        }[]
+      }
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
