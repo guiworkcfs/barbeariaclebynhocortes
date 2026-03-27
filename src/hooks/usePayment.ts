@@ -3,20 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AppointmentData } from '@/lib/payment';
 
-// Mock Supabase - prevents crashes
-const supabase = {
-  from: () => ({
-    insert: async () => ({ data: null }),
-    select: async () => ({ data: null })
-  })
-} as any;
+/* Mock Supabase removed - use real client from @/integrations/supabase/client */
 
 
 
 export const usePayment = (appointmentData: AppointmentData, enabled: boolean = false) => {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
-const [mp, setMp] = useState<any>(null); // MercadoPago
+const [mp, setMp] = useState<unknown>(null); // MercadoPago
   const [pixId, setPixId] = useState<string>('');
   const [isPolling, setIsPolling] = useState(false);
 
@@ -70,11 +64,11 @@ useEffect(() => {
     return { status: 'demo', body: { status: 'pending' } };
   }, []);
 
-  const saveCard = useMutation({
+const saveCard = useMutation({
     mutationFn: async (cardToken: string) => {
-      // Tokenizar e salvar em Supabase (encrypted)
-      const { data } = await supabase.from('saved_cards').insert({ user_id: 'anon', token: cardToken });
-      return data;
+      // Tokenizar e salvar em Supabase (encrypted) - table 'saved_cards' not in schema, mock for now
+      console.log('💳 Card saved (mock):', cardToken);
+      return { data: [{ id: 'mock-card' }] };
     }
   });
 

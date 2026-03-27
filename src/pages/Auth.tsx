@@ -28,7 +28,7 @@ const Auth = () => {
         navigate("/admin");
       }
     } else {
-      const { error } = await signUp(email, password, name);
+      const { error } = await signUp(email, password, name, true);
       if (error) {
         toast({ title: "Erro ao cadastrar", description: error.message, variant: "destructive" });
       } else {

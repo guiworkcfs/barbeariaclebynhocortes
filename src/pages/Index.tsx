@@ -14,6 +14,9 @@ import PaymentModal from "@/components/PaymentModal";
 import { useToast } from "@/components/ui/use-toast"; // shadcn toast
 import { usePayment } from "@/hooks/usePayment";
 import logo from "@/assets/logo.jpeg";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { UserCog } from "lucide-react";
 
 const SERVICES = [
   { id: "corte", name: "Corte de Cabelo", price: 35, durationMinutes: 30 },
@@ -32,12 +35,12 @@ const HOURS = Array.from({ length: 13 }, (_, i) => {
 });
 
 const PAYMENT_OPTIONS = [
-  { value: "online", label: "Pagar Online (PIX QR Code + Cartão)", icon: CreditCard },
-  { value: "presencial", label: "Pagar Presencial (PIX no local)", icon: MapPin },
+  { value: "online", label: "Pagar Online (PIX ou CARTÃO)", icon: CreditCard },
+  { value: "presencial", label: "Pagar Presencial", icon: MapPin },
 ];
 
 const Index = () => {
-  const [name, setName] = useState("Nome Padrão");
+  const [name, setName] = useState("");
 
   const [phone, setPhone] = useState("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -79,6 +82,8 @@ const Index = () => {
 
   const { toast } = useToast();
   const payment = usePayment(appData, total > 0);
+  const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
 
   const toggleService = (id: string) => {
     setSelectedServices((prev) =>
@@ -292,7 +297,7 @@ const Index = () => {
           ) : (
             <>
               <CheckCircle className="mr-2 h-5 w-5" />
-              {paymentType === 'online' ? 'Abrir QR PIX / Cartão' : 'Confirmar Presencial'}
+              {paymentType === 'online' ? 'Abrir QR CODE OU CADASTRO DE Cartão' : 'CONFIRMAR AGENDAMENTO'}
             </>
           )}
         </Button>
@@ -305,8 +310,25 @@ const Index = () => {
           disabled={!name || selectedServices.length === 0}
         >
           <MessageCircle className="mr-2 h-4 w-4" />
-          Falar com barbeiro por WhatsApp?
+          Falar com barbeiro por WhatsApp
         </Button>
+        {user && isAdmin ? (
+          <Button
+            onClick={() => navigate("/admin")}
+            className="w-full h-12 bg-primary text-primary-foreground font-bold uppercase tracking-wide shadow-md mt-3"
+          >
+            <UserCog className="mr-2 h-4 w-4" />
+            Painel Admin - Gerenciar Agendamentos
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            onClick={() => navigate("/auth")}
+            className="w-full h-12 text-sm font-medium uppercase tracking-wide border-2 border-foreground hover:bg-accent hover:text-foreground mt-3"
+          >
+            Entrar como Admin
+          </Button>
+        )}
       </main>
 
       {/* Payment Modal */}
