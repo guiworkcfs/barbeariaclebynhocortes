@@ -106,3 +106,4 @@ export const sendWhatsApp = (message: string) => {
   const encoded = encodeURIComponent(message);
   window.open(`https://wa.me/${BARBER_PHONE}?text=${encoded}`, '_blank');
 };
+
