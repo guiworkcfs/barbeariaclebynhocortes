@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, CheckCircle, Mail, MessageCircle, Phone, User, Scissors, CreditCard, MapPin } from "lucide-react";
+import { CalendarIcon, CheckCircle, Mail, MessageCircle, Phone, User, Scissors, CreditCard, MapPin, Github, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -9,7 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { AppointmentData, initiateOnlinePayment, confirmPresencial, sendWhatsApp } from "@/lib/payment";
+import { AppointmentData, initiateOnlinePayment, confirmPresencial, sendWhatsApp, getPixData } from "@/lib/payment";
+import PaymentModal from "@/components/PaymentModal";
+import { useToast } from "@/components/ui/use-toast"; // shadcn toast
+import { usePayment } from "@/hooks/usePayment";
 import logo from "@/assets/logo.jpeg";
 
 const SERVICES = [
@@ -29,18 +32,21 @@ const HOURS = Array.from({ length: 13 }, (_, i) => {
 });
 
 const PAYMENT_OPTIONS = [
-  { value: "online", label: "Pagar Online (PIX QR Code)", icon: CreditCard },
+  { value: "online", label: "Pagar Online (PIX QR Code + Cartão)", icon: CreditCard },
   { value: "presencial", label: "Pagar Presencial (PIX no local)", icon: MapPin },
 ];
 
 const Index = () => {
-  const [name, setName] = useState("");
+  const [name, setName] = useState("Nome Padrão");
+
   const [phone, setPhone] = useState("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [date, setDate] = useState<Date>();
   const [time, setTime] = useState("");
   const [paymentType, setPaymentType] = useState<"online" | "presencial">("online");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pixData, setPixData] = useState({ pixPayload: '', qrUrl: '' });
 
   const total = useMemo(
     () =>
@@ -60,6 +66,20 @@ const Index = () => {
     [selectedServices]
   );
 
+  const appData: AppointmentData = {
+    name,
+    phone,
+    services: SERVICES.filter((s) => selectedServices.includes(s.id)).map((s) => s.name),
+    total,
+    date: date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : '',
+    time,
+    paymentType,
+    totalDuration
+  };
+
+  const { toast } = useToast();
+  const payment = usePayment(appData, total > 0);
+
   const toggleService = (id: string) => {
     setSelectedServices((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
@@ -72,35 +92,33 @@ const Index = () => {
     if (!isFormValid) return;
     setIsLoading(true);
 
-    const serviceNames = SERVICES.filter((s) => selectedServices.includes(s.id)).map((s) => s.name);
-
-    const appData: AppointmentData = {
-      name,
-      phone,
-      services: serviceNames,
-      total,
-      date: format(date!, "dd/MM/yyyy", { locale: ptBR }),
-      time,
-      paymentType,
-      totalDuration
-    };
-
-    try {
-      let success = false;
-      if (paymentType === 'online') {
-        success = await initiateOnlinePayment(total, appData);
-      } else {
-        success = await confirmPresencial(appData);
-      }
-
+    if (paymentType === 'presencial') {
+      const success = await confirmPresencial(appData);
       if (success) {
-        alert('✅ Agendamento confirmado! Barbeiro foi notificado automaticamente.');
+        toast.success('✅ Agendamento presencial confirmado! Pague PIX no local.');
       }
-    } catch (error) {
-      console.error(error);
-      alert('❌ Erro ao processar. Tente novamente.');
-    } finally {
       setIsLoading(false);
+      return;
+    }
+
+    // Online payment
+    const data = getPixData(total, appData);
+    setPixData(data);
+    payment.createPix(total);
+    setShowPaymentModal(true);
+    setIsLoading(false);
+  };
+
+  const handlePaymentSuccess = async () => {
+    payment.setIsPolling(true);
+    // Trigger poll
+    try {
+      await payment.confirmPayment();
+      await notifyBarber(appData);
+      toast.success('🎉 Pagamento confirmado! Barbeiro notificado automaticamente.');
+      setShowPaymentModal(false);
+    } catch (error) {
+      toast.error('Pagamento ainda não confirmado. Aguarde.');
     }
   };
 
@@ -274,7 +292,7 @@ const Index = () => {
           ) : (
             <>
               <CheckCircle className="mr-2 h-5 w-5" />
-              {paymentType === 'online' ? 'Gerar QR PIX & Confirmar' : 'Confirmar Presencial'}
+              {paymentType === 'online' ? 'Abrir QR PIX / Cartão' : 'Confirmar Presencial'}
             </>
           )}
         </Button>
@@ -291,12 +309,52 @@ const Index = () => {
         </Button>
       </main>
 
+      {/* Payment Modal */}
+      <PaymentModal
+        open={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={handlePaymentSuccess}
+        appointmentData={appData}
+        pixPayload={pixData.pixPayload}
+        pixUrl={pixData.qrUrl}
+      />
+
       {/* Rodapé */}
-      <footer className="border-t border-border py-6 text-center text-muted-foreground text-sm">
-        <p>© Clebynho Cortes — Desde 2018</p>
-        <p className="mt-1 flex items-center justify-center gap-1">
-          <Phone className="w-3 h-3" /> (82) 98724-3277
+      <footer className="border-t border-border py-8 px-4 text-center text-muted-foreground">
+        <p className="text-sm mb-6">© Clebynho Cortes — Desde 2018</p>
+        <p className="mb-4 flex items-center justify-center gap-1 text-sm">
+          <Phone className="w-4 h-4" /> (82) 98724-3277
         </p>
+        
+        {/* Seção GitHub */}
+        <div className="max-w-md mx-auto bg-card border border-border rounded-xl p-6 space-y-4">
+          <h3 className="text-lg font-bold uppercase tracking-wide flex items-center justify-center gap-2 text-foreground">
+            <Github className="w-6 h-6" /> Veja no GitHub
+          </h3>
+          <p className="text-sm text-muted-foreground text-center">
+            Este site foi desenvolvido com código aberto! Acesse o repositório para ver o código fonte e contribuir.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a 
+              href="https://github.com/clebynhocortes/clebynhocortes-contact-main" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border rounded-lg font-medium transition-all text-sm"
+            >
+              <Github className="w-4 h-4" />
+              Ver Repositório
+            </a>
+            <a 
+              href="https://github.com/clebynhocortes/clebynhocortes-contact-main/stargazers" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 border rounded-lg font-medium transition-all text-sm hover:bg-accent"
+            >
+              <Star className="w-4 h-4" />
+              Dar Star
+            </a>
+          </div>
+        </div>
       </footer>
     </div>
   );

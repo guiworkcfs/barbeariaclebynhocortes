@@ -8,12 +8,12 @@ declare global {
   }
 }
 
-// Configs MOCK - substitua pelas reais
-export const MP_PUBLIC_KEY = 'TEST-f71e5a88-1f5b-4a9b-b1e3-1d0f7e0b2c9d'; // Sua chave pública MP test/prod
+// Configs from env (add to .env)
+export const MP_PUBLIC_KEY = import.meta.env.VITE_MP_PUBLIC_KEY || 'TEST-f71e5a88-1f5b-4a9b-b1e3-1d0f7e0b2c9d';
 export const EMAILJS_CONFIG = {
-  service_id: 'default_service',
-  template_id: 'template_agendamento',
-  public_key: 'user_mock'
+  service_id: import.meta.env.VITE_EMAILJS_SERVICE_ID || 'default_service',
+  template_id: import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_agendamento',
+  public_key: import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'user_mock'
 } as const;
 
 export const PIX_KEY = 'guicfswork@gmail.com';
@@ -68,27 +68,19 @@ export const createPixPayload = (amount: number, description: string, merchantNa
   return payload;
 };
 
-// Pagamento Online com QR PIX
-export const initiateOnlinePayment = async (total: number, appointmentData: AppointmentData) => {
-  console.log('🔄 Gerando QR PIX para R$', total);
-  
+// New: Get PIX data for modal
+export const getPixData = (total: number, appointmentData: AppointmentData) => {
   const description = `Agendamento ${appointmentData.name} - ${appointmentData.services.join(', ')}`;
   const pixPayload = createPixPayload(total, description);
-  
-  const qrUrl = `https://geradornumerico.com.br/qr?text=${encodeURIComponent(pixPayload)}`; // External QR gen for demo
-  const message = `📱 Escaneie o QR PIX abaixo com seu app bancário:\n\nPayload Pix:\n${pixPayload}\n\nQR: ${qrUrl}\n\nTotal: R$${total.toFixed(2)}\n\nApós pagar, clique OK para confirmar e notificar barbeiro (test).`;
-  
-  alert(message);
-  
-  // Mock approval (in prod, poll payment status)
-  if (confirm('Pagamento feito? Clique OK para confirmar.')) {
-    const success = await notifyBarber({...appointmentData, paymentType: 'online'});
-    if (success) {
-      alert('🎉 Pagamento confirmado! Barbeiro (82 98724-3277) foi notificado automaticamente.');
-    }
-    return success;
-  }
-  return false;
+  const qrUrl = `https://geradornumerico.com.br/qr?text=${encodeURIComponent(pixPayload)}`;
+  return { pixPayload, qrUrl };
+};
+
+// Updated for modal + polling hook
+export const initiateOnlinePayment = async (total: number, appointmentData: AppointmentData) => {
+  console.log('🔄 Use PaymentModal + usePayment hook for real flow with QR display and auto-confirm polling');
+  // Modal handles QR, polling via usePayment hook
+  return false; // Modal manages state
 };
 
 // Confirma presencial - SEM WhatsApp para cliente
