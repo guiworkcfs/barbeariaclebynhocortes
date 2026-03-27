@@ -1,0 +1,305 @@
+import { useState, useMemo } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { CalendarIcon, CheckCircle, Mail, MessageCircle, Phone, User, Scissors, CreditCard, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { AppointmentData, initiateOnlinePayment, confirmPresencial, sendWhatsApp } from "@/lib/payment";
+import logo from "@/assets/logo.jpeg";
+
+const SERVICES = [
+  { id: "corte", name: "Corte de Cabelo", price: 35, durationMinutes: 30 },
+  { id: "barba", name: "Barba", price: 25, durationMinutes: 15 },
+  { id: "sobrancelha", name: "Sobrancelha", price: 15, durationMinutes: 10 },
+  { id: "pigmentacao", name: "Pigmentação", price: 50, durationMinutes: 60 },
+  { id: "relaxamento", name: "Relaxamento", price: 45, durationMinutes: 45 },
+  { id: "hidratacao", name: "Hidratação Capilar", price: 40, durationMinutes: 40 },
+  { id: "platinado", name: "Platinado", price: 80, durationMinutes: 90 },
+  { id: "nevou", name: "Nevou", price: 60, durationMinutes: 60 },
+];
+
+const HOURS = Array.from({ length: 13 }, (_, i) => {
+  const h = i + 8;
+  return `${String(h).padStart(2, "0")}:00`;
+});
+
+const PAYMENT_OPTIONS = [
+  { value: "online", label: "Pagar Online (PIX QR Code)", icon: CreditCard },
+  { value: "presencial", label: "Pagar Presencial (PIX no local)", icon: MapPin },
+];
+
+const Index = () => {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [date, setDate] = useState<Date>();
+  const [time, setTime] = useState("");
+  const [paymentType, setPaymentType] = useState<"online" | "presencial">("online");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const total = useMemo(
+    () =>
+      SERVICES.filter((s) => selectedServices.includes(s.id)).reduce(
+        (sum, s) => sum + s.price,
+        0
+      ),
+    [selectedServices]
+  );
+
+  const totalDuration = useMemo(
+    () =>
+      SERVICES.filter((s) => selectedServices.includes(s.id)).reduce(
+        (sum, s) => sum + s.durationMinutes,
+        0
+      ),
+    [selectedServices]
+  );
+
+  const toggleService = (id: string) => {
+    setSelectedServices((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
+  };
+
+  const isFormValid = name && phone && selectedServices.length > 0 && date && time && paymentType;
+
+  const handleConfirm = async () => {
+    if (!isFormValid) return;
+    setIsLoading(true);
+
+    const serviceNames = SERVICES.filter((s) => selectedServices.includes(s.id)).map((s) => s.name);
+
+    const appData: AppointmentData = {
+      name,
+      phone,
+      services: serviceNames,
+      total,
+      date: format(date!, "dd/MM/yyyy", { locale: ptBR }),
+      time,
+      paymentType,
+      totalDuration
+    };
+
+    try {
+      let success = false;
+      if (paymentType === 'online') {
+        success = await initiateOnlinePayment(total, appData);
+      } else {
+        success = await confirmPresencial(appData);
+      }
+
+      if (success) {
+        alert('✅ Agendamento confirmado! Barbeiro foi notificado automaticamente.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('❌ Erro ao processar. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBarberChat = () => {
+    const message = `*Consulta Agendamento - Cliente*\n\nNome: ${name}\nTelefone: ${phone}\nServiços: ${SERVICES.filter(s => selectedServices.includes(s.id)).map(s => s.name).join(', ')}\nTotal: R$${total.toFixed(2)}\nTempo: ${totalDuration} min\nData: ${date ? format(date, "dd/MM", { locale: ptBR }) : ''} ${time}`;
+    sendWhatsApp(message);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Hero */}
+      <header className="flex flex-col items-center justify-center py-12 px-4 border-b border-border">
+        <img
+          src={logo}
+          alt="Logo Clebynho Cortes"
+          className="w-36 h-36 rounded-full object-cover border-2 border-foreground mb-6"
+        />
+        <h1 className="text-4xl md:text-5xl font-bold tracking-wider text-foreground uppercase">
+          Clebynho Cortes
+        </h1>
+        <p className="text-muted-foreground mt-2 text-lg tracking-widest uppercase">
+          Desde 2018 • Agende seu horário
+        </p>
+      </header>
+
+      {/* Formulário de Agendamento */}
+      <main className="max-w-lg mx-auto px-4 py-10 space-y-8">
+        {/* Dados do Cliente */}
+        <section className="space-y-4">
+          <h2 className="text-2xl font-bold uppercase tracking-wide flex items-center gap-2">
+            <User className="w-5 h-5" /> Seus Dados
+          </h2>
+          <Input
+            placeholder="Nome completo"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="bg-card border-border text-foreground placeholder:text-muted-foreground"
+          />
+          <Input
+            placeholder="Telefone/WhatsApp"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="bg-card border-border text-foreground placeholder:text-muted-foreground"
+          />
+        </section>
+
+        {/* Serviços */}
+        <section className="space-y-4">
+          <h2 className="text-2xl font-bold uppercase tracking-wide flex items-center gap-2">
+            <Scissors className="w-5 h-5" /> Serviços
+          </h2>
+          <div className="space-y-3">
+            {SERVICES.map((service) => (
+              <label
+                key={service.id}
+                className={cn(
+                  "flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-colors",
+                  selectedServices.includes(service.id)
+                    ? "bg-accent border-foreground"
+                    : "bg-card border-border hover:border-muted-foreground"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={selectedServices.includes(service.id)}
+                    onCheckedChange={() => toggleService(service.id)}
+                  />
+                  <span className="font-medium">{service.name}</span>
+                  <span className="text-sm text-muted-foreground">({service.durationMinutes}min)</span>
+                </div>
+                <span className="font-bold text-foreground">R$ {service.price},00</span>
+              </label>
+            ))}
+          </div>
+          {total > 0 && (
+            <>
+              <div className="flex justify-between items-center p-4 bg-secondary rounded-lg border border-border">
+                <span className="text-lg font-bold uppercase">Total</span>
+                <span className="text-2xl font-bold">R$ {total.toFixed(2)}</span>
+              </div>
+              <div className="p-4 bg-accent/50 rounded-lg border border-accent text-center font-medium">
+                Tempo estimado: {totalDuration} min 
+                ({Math.floor(totalDuration / 60)}h {totalDuration % 60}m)
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* Data e Horário */}
+        <section className="space-y-4">
+          <h2 className="text-2xl font-bold uppercase tracking-wide flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5" /> Data e Horário
+          </h2>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal bg-card border-border",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "dd 'de' MMMM, yyyy", { locale: ptBR }) : "Selecione a data"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-card border-border" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                locale={ptBR}
+                className="p-3"
+              />
+            </PopoverContent>
+          </Popover>
+          <div className="grid grid-cols-4 gap-2">
+            {HOURS.map((h) => (
+              <Button
+                key={h}
+                variant={time === h ? "default" : "outline"}
+                className={cn(
+                  "text-sm p-2 h-auto",
+                  time === h ? "bg-foreground text-background" : "bg-card border-border hover:bg-accent"
+                )}
+                onClick={() => setTime(h)}
+              >
+                {h}
+              </Button>
+            ))}
+          </div>
+        </section>
+
+        {/* Opção de Pagamento */}
+        <section className="space-y-4">
+          <h2 className="text-2xl font-bold uppercase tracking-wide flex items-center gap-2">
+            <Mail className="w-5 h-5" /> Como quer pagar?
+          </h2>
+          <RadioGroup 
+            value={paymentType} 
+            onValueChange={(value: string) => setPaymentType(value as "online" | "presencial")}
+            className="space-y-2"
+          >
+            {PAYMENT_OPTIONS.map((option) => (
+              <div key={option.value} className="flex items-center p-3 border rounded-lg cursor-pointer hover:border-foreground gap-3">
+                <RadioGroupItem value={option.value} id={option.value} className="flex-shrink-0" />
+                <div className="flex items-center gap-2">
+                  <option.icon className="w-5 h-5 flex-shrink-0" />
+                  <label htmlFor={option.value} className="font-medium cursor-pointer leading-tight">
+                    {option.label}
+                  </label>
+                </div>
+              </div>
+            ))}
+          </RadioGroup>
+        </section>
+
+        {/* Botão Confirmar */}
+        <Button
+          onClick={handleConfirm}
+          disabled={!isFormValid || isLoading}
+          className="w-full h-14 text-lg font-bold uppercase tracking-wide bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 shadow-lg"
+          size="lg"
+        >
+          {isLoading ? (
+            <>
+              <CheckCircle className="mr-2 h-5 w-5 animate-spin" />
+              Processando...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="mr-2 h-5 w-5" />
+              {paymentType === 'online' ? 'Gerar QR PIX & Confirmar' : 'Confirmar Presencial'}
+            </>
+          )}
+        </Button>
+
+        {/* Botão opcional falar com barbeiro */}
+        <Button
+          variant="outline"
+          onClick={handleBarberChat}
+          className="w-full h-12 text-sm font-medium uppercase tracking-wide border-foreground hover:bg-accent"
+          disabled={!name || selectedServices.length === 0}
+        >
+          <MessageCircle className="mr-2 h-4 w-4" />
+          Falar com barbeiro por WhatsApp?
+        </Button>
+      </main>
+
+      {/* Rodapé */}
+      <footer className="border-t border-border py-6 text-center text-muted-foreground text-sm">
+        <p>© Clebynho Cortes — Desde 2018</p>
+        <p className="mt-1 flex items-center justify-center gap-1">
+          <Phone className="w-3 h-3" /> (82) 98724-3277
+        </p>
+      </footer>
+    </div>
+  );
+};
+
+export default Index;
