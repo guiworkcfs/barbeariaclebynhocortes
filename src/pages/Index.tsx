@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, CheckCircle, Mail, MessageCircle, Phone, User, Scissors, CreditCard, MapPin, Github, Star } from "lucide-react";
+import { CalendarIcon, CheckCircle, Mail, MessageCircle, Phone, User, Scissors, CreditCard, MapPin } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -9,10 +10,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { AppointmentData, initiateOnlinePayment, confirmPresencial, sendWhatsApp, getPixData } from "@/lib/payment";
+import { AppointmentData, initiateOnlinePayment, confirmPresencial, sendWhatsApp, getPixData, notifyBarber } from "@/lib/payment";
 import PaymentModal from "@/components/PaymentModal";
-import { useToast } from "@/components/ui/use-toast"; // shadcn toast
+import { useToast } from "@/components/ui/use-toast";
 import { usePayment } from "@/hooks/usePayment";
+import { useAppointments } from "@/hooks/useAppointments";
+
 import logo from "@/assets/logo.jpeg";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -80,6 +83,14 @@ const Index = () => {
     totalDuration
   };
 
+  const { useBookedTimes, useSaveAppointment } = useAppointments();
+  const bookedTimesQuery = useBookedTimes(date);
+  const bookedTimes = bookedTimesQuery.data || [];
+  const saveAppointmentMutation = useSaveAppointment();
+
+  const availableHours = HOURS.filter(h => !bookedTimes.some((bt: string) => bt === h));
+
+
   const { toast } = useToast();
   const payment = usePayment(appData, total > 0);
   const navigate = useNavigate();
@@ -114,18 +125,32 @@ const Index = () => {
     setIsLoading(false);
   };
 
+
   const handlePaymentSuccess = async () => {
     payment.setIsPolling(true);
-    // Trigger poll
     try {
       await payment.confirmPayment();
       await notifyBarber(appData);
-      toast.success('🎉 Pagamento confirmado! Barbeiro notificado automaticamente.');
+
+      // Save to DB
+      const dbData = {
+        client_name: name,
+        client_phone: phone,
+        services: SERVICES.filter((s) => selectedServices.includes(s.id)).map((s) => s.name),
+        total_price: total,
+        appointment_date: date ? format(date, 'yyyy-MM-dd') : '',
+        appointment_time: time,
+      };
+      await saveAppointmentMutation.mutateAsync(dbData);
+
+      toast.success('🎉 Agendamento salvo no banco de dados! Barbeiro notificado.');
       setShowPaymentModal(false);
     } catch (error) {
-      toast.error('Pagamento ainda não confirmado. Aguarde.');
+      toast.error('Erro ao salvar agendamento.');
+      console.error(error);
     }
   };
+
 
   const handleBarberChat = () => {
     const message = `*Consulta Agendamento - Cliente*\n\nNome: ${name}\nTelefone: ${phone}\nServiços: ${SERVICES.filter(s => selectedServices.includes(s.id)).map(s => s.name).join(', ')}\nTotal: R$${total.toFixed(2)}\nTempo: ${totalDuration} min\nData: ${date ? format(date, "dd/MM", { locale: ptBR }) : ''} ${time}`;
@@ -242,7 +267,12 @@ const Index = () => {
             </PopoverContent>
           </Popover>
           <div className="grid grid-cols-4 gap-2">
-            {HOURS.map((h) => (
+            {availableHours.length === 0 && date && (
+              <p className="col-span-4 text-destructive text-sm text-center p-3 bg-destructive/10 rounded-md border border-destructive/50">
+                Todos os horários estão ocupados para esta data.
+              </p>
+            )}
+            {availableHours.map((h) => (
               <Button
                 key={h}
                 variant={time === h ? "default" : "outline"}
@@ -256,6 +286,10 @@ const Index = () => {
               </Button>
             ))}
           </div>
+          {bookedTimesQuery.isFetching && (
+            <p className="text-sm text-muted-foreground text-center col-span-4">Carregando horários...</p>
+          )}
+
         </section>
 
         {/* Opção de Pagamento */}
@@ -326,7 +360,7 @@ const Index = () => {
             onClick={() => navigate("/auth")}
             className="w-full h-12 text-sm font-medium uppercase tracking-wide border-2 border-foreground hover:bg-accent hover:text-foreground mt-3"
           >
-            Entrar como Admin
+            🔐 Login Admin
           </Button>
         )}
       </main>

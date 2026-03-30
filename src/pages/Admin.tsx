@@ -3,10 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LogOut, CalendarIcon, Scissors, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAppointments } from "@/hooks/useAppointments";
+
 
 interface Appointment {
   id: string;
@@ -22,9 +25,13 @@ interface Appointment {
 const Admin = () => {
   const { user, isAdmin, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [adminDate, setAdminDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const { toast } = useToast();
+  const { useBookedTimes } = useAppointments();
+  const bookedTimesQuery = useBookedTimes(adminDate);
+
 
   useEffect(() => {
     if (!loading && !user) {
@@ -43,14 +50,15 @@ const Admin = () => {
     if (isAdmin) {
       fetchAppointments();
     }
-  }, [isAdmin]);
+  }, [isAdmin, adminDate]);
+
 
   const fetchAppointments = async () => {
     setLoadingData(true);
     const { data, error } = await supabase
       .from("appointments")
       .select("*")
-      .order("appointment_date", { ascending: true })
+      .eq("appointment_date", format(adminDate, "yyyy-MM-dd"))
       .order("appointment_time", { ascending: true });
 
     if (!error && data) {
@@ -58,6 +66,7 @@ const Admin = () => {
     }
     setLoadingData(false);
   };
+
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("appointments").delete().eq("id", id);
@@ -93,9 +102,45 @@ const Admin = () => {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold uppercase tracking-wide flex items-center gap-2 mb-6">
-          <CalendarIcon className="w-5 h-5" /> Agendamentos
-        </h2>
+        <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
+          <h2 className="text-2xl font-bold uppercase tracking-wide flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5" /> Agendamentos
+          </h2>
+          <div className="flex items-center gap-2">
+            <Calendar
+              mode="single"
+              selected={adminDate}
+              onSelect={(d) => {
+                if (d) {
+                  setAdminDate(d);
+                  fetchAppointments();
+                }
+              }}
+              locale={ptBR}
+              className="rounded-md border"
+            />
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                setAdminDate(today);
+                fetchAppointments();
+              }}
+            >
+              Hoje
+            </Button>
+          </div>
+        </div>
+        {bookedTimesQuery.data && (
+          <div className="mb-4 p-3 bg-secondary rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              Horários ocupados hoje: {bookedTimesQuery.data.length} / 13 (8h-20h)
+            </p>
+          </div>
+        )}
+
 
         {loadingData ? (
           <p className="text-muted-foreground">Carregando agendamentos...</p>
