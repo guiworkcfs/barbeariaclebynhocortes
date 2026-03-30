@@ -348,35 +348,7 @@ const Index = () => {
           <Phone className="w-4 h-4" /> (82) 98724-3277
         </p>
         
-        {/* Seção GitHub */}
-        <div className="max-w-md mx-auto bg-card border border-border rounded-xl p-6 space-y-4">
-          <h3 className="text-lg font-bold uppercase tracking-wide flex items-center justify-center gap-2 text-foreground">
-            <Github className="w-6 h-6" /> Veja no GitHub
-          </h3>
-          <p className="text-sm text-muted-foreground text-center">
-            Este site foi desenvolvido com código aberto! Acesse o repositório para ver o código fonte e contribuir.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a 
-              href="https://github.com/clebynhocortes/clebynhocortes-contact-main" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border rounded-lg font-medium transition-all text-sm"
-            >
-              <Github className="w-4 h-4" />
-              Ver Repositório
-            </a>
-            <a 
-              href="https://github.com/clebynhocortes/clebynhocortes-contact-main/stargazers" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 border rounded-lg font-medium transition-all text-sm hover:bg-accent"
-            >
-              <Star className="w-4 h-4" />
-              Dar Star
-            </a>
-          </div>
-        </div>
+
       </footer>
     </div>
   );
