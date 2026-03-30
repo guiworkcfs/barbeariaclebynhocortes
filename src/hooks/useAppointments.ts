@@ -54,12 +54,3 @@ export const useAppointments = () => {
     useSaveAppointment,
   };
 };
-
-
-
-</xai:function_call?
-
-
-
-<xai:function_call name="edit_file">
-<parameter name="path">c:/Users/UserGui/Desktop/clebynhocortes-contact-main/TODO.md
